@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """HTTP-сервер «Двадцятого Києва»: віддає фронтенд (../frontend) і має один ендпоінт.
 
     POST /api/user-point   {"user_point": [latitude, longitude]}
@@ -26,13 +26,23 @@ def present(result):
     """Приводить відповідь logic.on_user_point до вигляду, який показує фронтенд."""
     if result is None:
         return None
+    
+    # Якщо прийшов список точок (наприклад, 5 штук), обробляємо кожну
+    if isinstance(result, list):
+        return [present(item) for item in result]
+        
     if not isinstance(result, dict):
-        raise TypeError("on_user_point має повертати dict або None")
+        raise TypeError("on_user_point має повертати dict, список або None")
+        
     out = {}
-    for key in ("title", "date", "description"):
+    # У CSV назва події зберігається в полі name.
+    out["title"] = str(result.get("id", result.get("name", result.get("title", "Історична подія"))))
+    for key in ("date", "description", "source_url"):
         if result.get(key) is not None:
             value = result[key]
             out[key] = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    if result.get("coordinates") is not None:
+        out["coordinates"] = result["coordinates"]
     if result.get("period") is not None:
         number = store.parse_period(result["period"])
         out["period"] = number
@@ -93,3 +103,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
