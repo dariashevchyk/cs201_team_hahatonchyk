@@ -146,10 +146,9 @@ def _write_points(points):
         json.dump(list(points.values()), tmp, ensure_ascii=False, indent=2)
     os.replace(tmp_name, POINTS_FILE)
 
-
 # ---------- Публічні функції ----------
 
-def add_point(name, date, period, description, coordinates):
+def add_point(name, date, period, description, coordinates, source_url=""):
     """Додає точку (або оновлює, якщо точка з таким id вже є) і повертає її.
 
     name        — рядок або число, унікальний ідентифікатор
@@ -172,6 +171,7 @@ def add_point(name, date, period, description, coordinates):
         "period": _parse_period(period),
         "description": description,
         "coordinates": check_coordinates(coordinates),
+        "source_url": str(source_url).strip(),
     }
     with _lock:
         points = _read_points()
