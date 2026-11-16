@@ -52,3 +52,37 @@ def on_user_point(user_point):
     """user_point = [latitude, longitude] — точка, яку поставив користувач.
     Приклад: показуємо найближчий запис у радіусі SEARCH_RADIUS_M."""
     return nearest_point(user_point)
+
+
+
+
+import csv
+from pathlib import Path
+
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def load_events():
+    events = []
+    csv_files = DATA_DIR.glob("*.csv")
+
+    for file_path in csv_files:
+        with open(file_path, "r", encoding="utf-8-sig", newline="") as file:
+            reader = csv.DictReader(file)
+
+            for row in reader:
+                event = {
+                    "name": row["name"],
+                    "date": row["date"],
+                    "period": int(row["period"]),
+                    "description": row["description"],
+                    "latitude": float(row["latitude"]) if row["latitude"] else None,
+                    "longitude": float(row["longitude"]) if row["longitude"] else None,
+                    "link": row["link"]
+                }
+
+                events.append(event)
+
+    return events
+
+events = load_events()
