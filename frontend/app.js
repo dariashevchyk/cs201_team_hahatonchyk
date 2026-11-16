@@ -215,7 +215,8 @@
   var dataList = document.getElementById("point-data");
   var DEFAULT_TITLE = "Точка на мапі";
 
-  var userMarker = null;   // єдина точка користувача
+  var userMarker = null;   // точка, яку поставив користувач
+  var nearestLayer = L.layerGroup().addTo(map); // п’ять найближчих історичних точок
   var requestId = 0;       // щоб запізніла відповідь на попередню точку не перезаписала панель
 
   var userIcon = L.divIcon({
@@ -265,20 +266,58 @@
     dataList.hidden = rows.length === 0;
   }
 
-  function renderResult(result, latlng) {
-    var rows = [];
-    if (result) {
-      panelTitle.textContent = result.title || DEFAULT_TITLE;
-      stateEl.hidden = true;
-      if (result.date) rows.push(["Дата", result.date]);
-      if (result.period_name) rows.push(["Епоха", result.period_name]);
-      if (result.description) rows.push(["Опис", result.description, true]);
-    } else {
-      showState("Для цієї точки немає даних.");
+  // Показуємо найближчі події у панелі та їхні маркери на мапі.
+  function renderResult(data) {
+    nearestLayer.clearLayers();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      showState("Поруч не знайдено історичних подій.");
+      dataList.hidden = true;
+      return;
     }
-    rows.push(["Координати", latlng.lat.toFixed(5) + ", " + latlng.lng.toFixed(5)]);
-    setRows(rows);
+
+    stateEl.hidden = true;
+    dataList.textContent = "";
+    panelTitle.textContent = "Найближчі історичні локації";
+
+    data.forEach(function (point, index) {
+      if (point.coordinates && point.coordinates.length === 2) {
+        var marker = L.marker(point.coordinates).addTo(nearestLayer);
+        marker.bindPopup(String(point.title || "Історична подія"));
+      }
+
+      var heading = document.createElement("dt");
+      var title = document.createElement("strong");
+      title.textContent = "#" + (index + 1) + ": " + (point.title || "Подія");
+      heading.appendChild(title);
+      if (point.date) heading.appendChild(document.createTextNode(" (" + point.date + ")"));
+      dataList.appendChild(heading);
+
+      var details = document.createElement("dd");
+      details.className = "is-text";
+      var description = document.createElement("p");
+      description.textContent = point.description || "Опис цієї події поки відсутній.";
+      details.appendChild(description);
+
+      if (point.period_name) {
+        var period = document.createElement("p");
+        period.textContent = "Епоха: " + point.period_name;
+        details.appendChild(period);
+      }
+      if (point.source_url) {
+        var link = document.createElement("a");
+        link.href = point.source_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Джерело";
+        details.appendChild(link);
+      }
+      dataList.appendChild(details);
+    });
+
+    dataList.hidden = false;
   }
+
 
   function openPanel() {
     panel.classList.add("is-open");
@@ -295,9 +334,11 @@
       map.removeLayer(userMarker);
       userMarker = null;
     }
+    nearestLayer.clearLayers();
   }
 
   function placeUserPoint(latlng) {
+    nearestLayer.clearLayers();
     if (userMarker) map.removeLayer(userMarker);   // попередня точка зникає
     userMarker = L.marker(latlng, { icon: userIcon, interactive: false, keyboard: false }).addTo(map);
     var id = ++requestId;
@@ -315,7 +356,7 @@
     }
 
     askBackend(latlng)
-      .then(function (result) { if (id === requestId) renderResult(result, latlng); })
+      .then(function (result) { if (id === requestId) renderResult(result); })
       .catch(function (err) { if (id === requestId) showState(errText(err), true); });
   }
 
