@@ -205,7 +205,7 @@
     animateTo(target);
   });
 
-  /* ---------- Точка користувача: що вона означає ---------- */
+  /* ---------- Точка користувача: що вона означає, вирішує Python-бекенд ---------- */
   var USER_POINT_URL = "/api/user-point";
 
   var panel = document.getElementById("point-panel");
@@ -225,7 +225,9 @@
   });
 
   function errText(err) {
-    
+    return err instanceof TypeError
+      ? "Немає зв'язку з бекендом. Запустіть python backend/server.py."
+      : err.message;
   }
 
   // POST user_point = [latitude, longitude] → відповідь logic.on_user_point
@@ -295,8 +297,26 @@
     }
   }
 
-  function placeUserPoint() {
-    // тут буде звертання до пайтона
+  function placeUserPoint(latlng) {
+    if (userMarker) map.removeLayer(userMarker);   // попередня точка зникає
+    userMarker = L.marker(latlng, { icon: userIcon, interactive: false, keyboard: false }).addTo(map);
+    var id = ++requestId;
+
+    panelTitle.textContent = DEFAULT_TITLE;
+    setRows([]);
+    showState("Запитуємо бекенд…");
+    openPanel();
+
+    // На широких екранах панель закриває праву частину мапи — зсуваємо мапу
+    if (window.innerWidth > 640) {
+      var x = map.latLngToContainerPoint(latlng).x;
+      var overlap = x - (map.getSize().x - panel.offsetWidth - 48);
+      if (overlap > 0) map.panBy([overlap, 0]);
+    }
+
+    askBackend(latlng)
+      .then(function (result) { if (id === requestId) renderResult(result, latlng); })
+      .catch(function (err) { if (id === requestId) showState(errText(err), true); });
   }
 
   /* --- Події --- */
@@ -315,46 +335,3 @@
     if (e.key === "Escape" && panel.classList.contains("is-open")) closePanel();
   });
 })();
-
-async function loadMapPoints() {
-    try {
-        const response = await fetch('[http://127.0.0.1:8000/api/points](http://127.0.0.1:8000/api/points)');
-        const points = await response.json();
-
-        points.forEach(pt => {
-            const marker = L.marker(pt.coordinates).addTo(map);
-
-            let popupHtml = `
-                <div style="font-family: inherit; max-width: 260px; padding: 4px;">
-                    <span style="background: #f1f2f6; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; color: #555;">
-                        📅 ${pt.date}
-                    </span>
-                    <h3 style="margin: 8px 0 6px 0; font-size: 15px; color: #2c3e50;">
-                        ${pt.id}
-                    </h3>
-                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #555;">
-                        ${pt.description}
-                    </p>
-            `;
-
-            if (pt.sourceUrl && pt.sourceName) {
-                popupHtml += `
-                    <div style="border-top: 1px solid #eee; padding-top: 6px; margin-top: 4px;">
-                        <a href="${pt.sourceUrl}" target="_blank" style="font-size: 12px; color: #0066cc; text-decoration: none;">
-                            🔗 Джерело: ${pt.sourceName}
-                        </a>
-                    </div>
-                `;
-            }
-
-            popupHtml += `</div>`;
-            marker.bindPopup(popupHtml, { maxWidth: 300 });
-        });
-
-    } catch (error) {
-        console.error("Помилка завантаження точок:", error);
-    }
-}
-
-// Запуск при завантаженні сторінки
-loadMapPoints();
