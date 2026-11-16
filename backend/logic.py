@@ -1,56 +1,106 @@
-"""Ваш код бекенду. Уся логіка живе тут, у Python.
+"""Логіка пошуку найближчих історичних точок для кліку на мапі."""
 
-Фронтенд лише дозволяє поставити точку на мапі й показує те, що ви повернете.
-Коли користувач ставить точку, сюди приходить список
-    user_point = [latitude, longitude]
-(гарантовано всередині меж Києва). Точка зникає з мапи, щойно користувач
-закриє праву панель або поставить іншу.
-
-Що повертати з on_user_point:
-    dict з необов'язковими ключами  title, date, period, description
-    або None, якщо для цієї точки нічого показувати.
-"""
-
+import csv
 import math
+from pathlib import Path
 
-from store import add_point, clear_point, get_points   # clear_point, get_points — для ваших потреб
+import store
 
-SEARCH_RADIUS_M = 250   # як близько до точки користувача шукати записи
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+
+def _parse_csv_row(line):
+    """Розбирає рядок із комою або крапкою з комою як роздільником.
+
+    Деякі рядки у вихідних CSV мають неекрановані коми в описі,
+    тому текст опису збирається з усіх проміжних колонок.
+    """
+    candidates = []
+    for delimiter in (",", ";", "\t"):
+        try:
+            fields = next(csv.reader([line], delimiter=delimiter))
+            if len(fields) >= 7:
+                candidates.append(fields)
+        except csv.Error:
+            pass
+    if not candidates:
+        return None
+    fields = max(candidates, key=len)
+    if fields[0].strip().lower() == "name":
+        return None
+    return {
+        "name": fields[0].strip(),
+        "date": fields[1].strip(),
+        "period": fields[2].strip(),
+        "description": ",".join(fields[3:-3]).strip(),
+        "latitude": fields[-3].strip(),
+        "longitude": fields[-2].strip(),
+        "link": fields[-1].strip(),
+    }
+
+
+def _normalize_date(value):
+    """Перетворює дату або місяць із CSV на дату YYYY-MM-DD."""
+    value = value.strip()
+    if len(value) == 4 and value.isdigit():
+        return value + "-01-01"
+    if len(value) == 7 and value[4] == "-":
+        return value + "-01"
+    # У частині рядків трапляється YYYY-DD-MM замість YYYY-MM-DD.
+    parts = value.split("-")
+    if len(parts) == 3 and parts[1].isdigit() and int(parts[1]) > 12:
+        return parts[0] + "-" + parts[2] + "-" + parts[1]
+    return value
 
 
 def setup():
-    """Викликається один раз під час запуску сервера. Наповнюйте дані тут.
-    add_point оновлює запис, якщо такий id уже є, тож повторний запуск безпечний.
-    Нижче лише приклади — замініть їх власними."""
-    add_point("maidan-1941", "1941-09-19", 4, "19 вересня 1941 року до Києва увійшли німецькі війська. Окупація міста тривала до листопада 1943 року.", [50.4501, 30.5234])
-    add_point(
-        "rada-1991", "1991-08-24", 8,
-        "24 серпня 1991 року Верховна Рада УРСР ухвалила Акт проголошення незалежності України.",
-        [50.4478, 30.5325]
-    )
+    """Імпортує всі CSV із каталогу data/ у сховище точок."""
+    if not DATA_DIR.exists():
+        print(f"Каталог із CSV не знайдено: {DATA_DIR}")
+        return
 
-setup()
+    imported = 0
+    skipped = 0
+    for csv_path in sorted(DATA_DIR.glob("*.csv")):
+        try:
+            with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
+                for line in file:
+                    row = _parse_csv_row(line)
+                    if row is None:
+                        continue
+                    try:
+                        store.add_point(
+                            name=row["name"],
+                            date=_normalize_date(row["date"]),
+                            period=row["period"],
+                            description=row["description"],
+                            coordinates=[float(row["latitude"]), float(row["longitude"])],
+                            source_url=row["link"],
+                        )
+                        imported += 1
+                    except (KeyError, TypeError, ValueError):
+                        skipped += 1
+        except (OSError, UnicodeError, csv.Error) as error:
+            print(f"Помилка читання {csv_path.name}: {error}")
+
+    print(f"Імпорт завершено: {imported} рядків; пропущено: {skipped}; унікальних точок: {len(store.get_points())}.")
+
 
 def distance_m(a, b):
-    """Відстань між двома [lat, lng] у метрах (формула гаверсинуса)."""
+    """Відстань між двома [широта, довгота] у метрах (формула гаверсинуса)."""
     lat1, lng1, lat2, lng2 = map(math.radians, (a[0], a[1], b[0], b[1]))
     h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lng2 - lng1) / 2) ** 2
     return 2 * 6371000 * math.asin(math.sqrt(h))
 
 
-def nearest_point(user_point, max_distance_m=SEARCH_RADIUS_M):
-    """Найближча збережена точка в межах max_distance_m або None."""
-    best, best_distance = None, max_distance_m
-    for point in get_points():
-        d = distance_m(user_point, point["coordinates"])
-        if d <= best_distance:
-            best, best_distance = point, d
-    return best
+def nearest_points(user_point, limit=5):
+    """Повертає до limit найближчих імпортованих точок до кліку користувача."""
+    points = store.get_points()
+    points.sort(key=lambda point: distance_m(user_point, point["coordinates"]))
+    return points[:limit]
 
 
 def on_user_point(user_point):
-    """user_point = [latitude, longitude] — точка, яку поставив користувач.
-    Приклад: показуємо найближчий запис у радіусі SEARCH_RADIUS_M."""
-    return nearest_point(user_point)
-
+    """Повертає п'ять найближчих подій до [latitude, longitude]."""
+    return nearest_points(user_point, 5)
 
