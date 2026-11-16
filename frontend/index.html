@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Двадцятий Київ: Крізь Епохи</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Застосувати збережену тему до першого малювання, щоб уникнути блимання -->
+  <script>
+    (function () {
+      var theme = null;
+      try { theme = localStorage.getItem("theme"); } catch (e) {}
+      if (!theme) {
+        theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+</head>
+<body>
+
+  <header class="topbar">
+    <h1 class="topbar__title">Двадцятий Київ</h1>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Темна тема">
+      <span class="theme-toggle__label">Світла</span>
+      <span class="theme-toggle__track" aria-hidden="true"><span class="theme-toggle__thumb"></span></span>
+      <span class="theme-toggle__label">Темна</span>
+    </button>
+  </header>
+
+  <section class="timeline" aria-label="Історична епоха">
+    <div class="timeline__head">
+      <output class="timeline__year" id="year-output" for="year-slider">Українська революція</output>
+      <div class="timeline__control">
+        <!-- step="any": повзунок рухається плавно, а після відпускання сам «доїжджає» до найближчої епохи -->
+        <input class="timeline__slider" id="year-slider" type="range"
+                  min="1" max="7" step="any" value="1"
+                  aria-label="Епоха" aria-valuetext="Українська революція">
+        <!-- Світло-сірі мітки: 7 зупинок повзунка -->
+        <div class="timeline__ticks" aria-hidden="true">
+        <span style="--i:0">1917-1921</span>
+        <span style="--i:1">1921-1941</span>
+        <span style="--i:2">1941-1945</span>
+        <span style="--i:3">1945-1953</span>
+        <span style="--i:4">1953-1964</span>
+        <span style="--i:5">1964-1985</span>
+        <span style="--i:6">1985-1991</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="map-wrap">
+    <div id="map" role="application" aria-label="Мапа районів Києва. Натисніть, щоб поставити точку"></div>
+
+    <p class="map-status" id="map-status" role="status" hidden></p>
+
+    <!-- Панель опису точки -->
+    <aside class="point-panel" id="point-panel" aria-labelledby="point-panel-title" aria-hidden="true">
+      <div class="point-panel__head">
+        <h2 class="point-panel__title" id="point-panel-title">Точка на мапі</h2>
+        <button class="point-panel__close" id="panel-close" type="button" aria-label="Закрити панель">&times;</button>
+      </div>
+
+      <!-- Лише перегляд: усе, що тут показано, надсилає Python-бекенд -->
+      <p class="point-panel__state" id="point-state" role="status">Запитуємо бекенд…</p>
+      <dl class="point-panel__meta" id="point-data" hidden></dl>
+    </aside>
+
+  </main>
+
+  <script src="kyiv_outline.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
