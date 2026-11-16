@@ -205,7 +205,7 @@
     animateTo(target);
   });
 
-  /* ---------- Точка користувача: що вона означає, вирішує Python-бекенд ---------- */
+  /* ---------- Точка користувача: що вона означає ---------- */
   var USER_POINT_URL = "/api/user-point";
 
   var panel = document.getElementById("point-panel");
@@ -225,9 +225,7 @@
   });
 
   function errText(err) {
-    return err instanceof TypeError
-      ? "Немає зв'язку з бекендом. Запустіть python backend/server.py."
-      : err.message;
+    
   }
 
   // POST user_point = [latitude, longitude] → відповідь logic.on_user_point
@@ -297,26 +295,8 @@
     }
   }
 
-  function placeUserPoint(latlng) {
-    if (userMarker) map.removeLayer(userMarker);   // попередня точка зникає
-    userMarker = L.marker(latlng, { icon: userIcon, interactive: false, keyboard: false }).addTo(map);
-    var id = ++requestId;
-
-    panelTitle.textContent = DEFAULT_TITLE;
-    setRows([]);
-    showState("Запитуємо бекенд…");
-    openPanel();
-
-    // На широких екранах панель закриває праву частину мапи — зсуваємо мапу
-    if (window.innerWidth > 640) {
-      var x = map.latLngToContainerPoint(latlng).x;
-      var overlap = x - (map.getSize().x - panel.offsetWidth - 48);
-      if (overlap > 0) map.panBy([overlap, 0]);
-    }
-
-    askBackend(latlng)
-      .then(function (result) { if (id === requestId) renderResult(result, latlng); })
-      .catch(function (err) { if (id === requestId) showState(errText(err), true); });
+  function placeUserPoint() {
+    // тут буде звертання до пайтона
   }
 
   /* --- Події --- */
