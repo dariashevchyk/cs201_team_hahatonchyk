@@ -297,12 +297,12 @@
       details.className = "is-text";
       var description = document.createElement("p");
       description.textContent = point.description || "Опис цієї події поки відсутній.";
-      details.appendChild(description);
+      heading.appendChild(description);
 
       if (point.period_name) {
         var period = document.createElement("p");
         period.textContent = "Епоха: " + point.period_name;
-        details.appendChild(period);
+        heading.appendChild(period);
       }
       if (point.source_url) {
         var link = document.createElement("a");
@@ -310,7 +310,7 @@
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = "Джерело";
-        details.appendChild(link);
+        heading.appendChild(link);
       }
       dataList.appendChild(details);
     });
