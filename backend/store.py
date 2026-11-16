@@ -153,7 +153,7 @@ def add_point(name, date, period, description, coordinates, source_url=""):
 
     name        — рядок або число, унікальний ідентифікатор
     date        — "РРРР-ММ-ДД" або datetime.date, рік 1917–1991
-    period      — номер епохи 1–8 або її назва (див. PERIODS)
+    period      — номер епохи 1–7 або її назва (див. PERIODS)
     description — текстовий опис
     coordinates — [latitude, longitude], усередині меж Києва
 
