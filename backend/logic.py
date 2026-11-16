@@ -103,4 +103,3 @@ def nearest_points(user_point, limit=5):
 def on_user_point(user_point):
     """Повертає п'ять найближчих подій до [latitude, longitude]."""
     return nearest_points(user_point, 5)
-
