@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python3
 """HTTP-сервер «Двадцятого Києва»: віддає фронтенд (../frontend) і має один ендпоінт.
 
     POST /api/user-point   {"user_point": [latitude, longitude]}
@@ -103,4 +103,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
