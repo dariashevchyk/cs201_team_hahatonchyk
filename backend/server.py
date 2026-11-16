@@ -1,10 +1,43 @@
+#!/usr/bin/env python3
+"""HTTP-сервер «Двадцятого Києва»: віддає фронтенд (../frontend) і має один ендпоінт.
+
+    POST /api/user-point   {"user_point": [latitude, longitude]}
+                           → {"result": {...} | null}  (результат logic.on_user_point)
+
+Уся логіка — у logic.py, дані — у store.py. Потрібен лише Python 3.9+.
+
+Запуск:  python backend/server.py   →   http://127.0.0.1:8000
+"""
+
 import json
 import os
+import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+import logic
+import store
+
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+
+def present(result):
+    """Приводить відповідь logic.on_user_point до вигляду, який показує фронтенд."""
+    if result is None:
+        return None
+    if not isinstance(result, dict):
+        raise TypeError("on_user_point має повертати dict або None")
+    out = {}
+    for key in ("title", "date", "description"):
+        if result.get(key) is not None:
+            value = result[key]
+            out[key] = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    if result.get("period") is not None:
+        number = store.parse_period(result["period"])
+        out["period"] = number
+        out["period_name"] = store.PERIODS[number]
+    return out
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -33,28 +66,25 @@ class Handler(SimpleHTTPRequestHandler):
             if not 0 < length <= 4096:
                 raise ValueError("некоректний розмір запиту")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            coords = payload.get("user_point")
-            if not isinstance(coords, list) or len(coords) != 2:
-                raise ValueError("очікувався список [latitude, longitude]")
-            lat, lon = float(coords[0]), float(coords[1])
-        except (ValueError, TypeError, UnicodeDecodeError) as err:
+            if not isinstance(payload, dict):
+                raise ValueError("очікувався JSON-об'єкт")
+            user_point = store.check_coordinates(payload.get("user_point"))   # [latitude, longitude]
+        except (ValueError, UnicodeDecodeError) as err:
             return self._json(400, {"error": str(err)})
 
-        # Заглушка відповіді (без logic.py та store.py)
-        stub_result = {
-            "title": "Тестова подія (заглушка)",
-            "date": "1920-01-01",
-            "description": f"Клік у точці: {lat:.5f}, {lon:.5f}",
-            "period": 1,
-            "period_name": "Тестовий період"
-        }
-        self._json(200, {"result": stub_result})
+        try:
+            result = present(logic.on_user_point(user_point))
+        except Exception as err:   # помилка у вашому коді з logic.py
+            traceback.print_exc()
+            return self._json(500, {"error": f"Помилка в logic.on_user_point: {err}"})
+        self._json(200, {"result": result})
 
 
 def main():
+    logic.setup()
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"[Заглушка] Сторінка та API: http://127.0.0.1:{port}  (Ctrl+C — зупинити)")
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)   # лише локально
+    print(f"Сторінка та API: http://127.0.0.1:{port}  (Ctrl+C — зупинити)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
